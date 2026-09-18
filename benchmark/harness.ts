@@ -13,13 +13,13 @@
 // independent acceptance command, so the path exercised here is the same code
 // T9's real model would touch.
 
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync, existsSync, accessSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { createHash } from 'node:crypto';
 import { selfDebug } from '../src/self-debug.ts';
 import { runCommand } from '../src/runner.ts';
-import type { AgentDriver, BenchmarkTask, DriverContext, TaskRecord } from './types.ts';
+import type { AgentDriver, BenchmarkTask, DriverContext, TaskRecord, TokenAccount } from './types.ts';
 
 /** Equal in-session repair budget for BOTH arms (ADR-0001 §Benchmark protocol). */
 export const MAX_ROUNDS = 3;
@@ -72,6 +72,77 @@ function diffHashes(
 }
 
 /**
+ * True when `bin` resolves on the current PATH (honours DSH_NODE_BIN_DIR /
+ * the node bin dir prepended by the CLI). Used to decide whether a task's
+ * acceptance command can actually run in this environment.
+ */
+export function commandExists(bin: string): boolean {
+  const path = process.env.PATH ?? '';
+  const sep = path.includes(';') ? ';' : ':';
+  for (const dir of path.split(sep)) {
+    if (!dir) continue;
+    for (const candidate of [join(dir, bin), join(dir, `${bin}.exe`)]) {
+      try {
+        accessSync(candidate);
+        return true;
+      } catch {
+        // not at this path element; keep scanning.
+      }
+    }
+  }
+  return false;
+}
+
+/**
+ * Decide whether a task should be SKIPPED rather than executed: a task whose
+ * acceptance command cannot run in this environment (e.g. a go task when the go
+ * toolchain is absent) is recorded as skipped with a reason so the manifest
+ * stays honest. We skip when either (a) the task author flagged it
+ * `offlineRunnable: false`, or (b) the acceptance command's binary is not on
+ * PATH — both make a real verdict impossible here.
+ */
+export function detectSkip(task: BenchmarkTask): { skip: boolean; reason?: string } {
+  const bin = task.acceptanceCommand.trim().split(/\s+/)[0] ?? '';
+  if (task.offlineRunnable === false) {
+    return {
+      skip: true,
+      reason: `task "${task.id}" (${task.language}) is not offline-runnable in this environment; its acceptance command "${task.acceptanceCommand}" requires a toolchain that is absent. Recorded as skipped (will execute at T9 where the toolchain exists).`,
+    };
+  }
+  if (bin && !commandExists(bin)) {
+    return {
+      skip: true,
+      reason: `acceptance command "${task.acceptanceCommand}" cannot run: "${bin}" is not on PATH. Recorded as skipped.`,
+    };
+  }
+  return { skip: false };
+}
+
+/** Build a TaskRecord for a skipped task (no execution, no verdict). */
+export function skipRecord(task: BenchmarkTask, reason: string): TaskRecord {
+  return {
+    taskId: task.id,
+    arm: 'plugin',
+    driver: 'skipped',
+    status: 'skipped',
+    skipReason: reason,
+    roundsUsed: 0,
+    maxRounds: MAX_ROUNDS,
+    claimedDone: false,
+    eligibleTurns: 0,
+    selfDebugCalls: 0,
+    callRate: null,
+    tokens: { input: null, output: null, source: 'none' },
+    wallTimeMs: 0,
+    hashModified: false,
+    modifiedFiles: [],
+    verdict: 'fail',
+    verdictReason: 'acceptance',
+    acceptanceExitCode: null,
+  };
+}
+
+/**
  * Run one task under one arm and return its record. The driver is responsible
  * for the in-session repair loop; the harness owns the verdict path (hash guard
  * + independent acceptance) so it cannot be gamed by the driver or the model.
@@ -83,6 +154,16 @@ export async function runTask(
 ): Promise<TaskRecord> {
   const maxRounds = opts.maxRounds ?? MAX_ROUNDS;
   const now = opts.now ?? (() => Date.now());
+
+  // Skip when the task cannot be executed in this environment (e.g. go task,
+  // no go toolchain). The manifest stays honest: a skipped task is recorded
+  // with a reason and excluded from success-rate accounting. The verdict path
+  // is never faked.
+  const skip = detectSkip(task);
+  if (skip.skip) {
+    return { ...skipRecord(task, skip.reason ?? 'skipped'), arm: driver.arm, driver: driver.name };
+  }
+
   const workspace = makeWorkspace();
   writeScaffold(workspace, task.scaffold);
 
@@ -91,6 +172,13 @@ export async function runTask(
 
   let eligibleTurns = 0;
   let selfDebugCalls = 0;
+  // Real-agent drivers report self_debug calls / token usage observed in the
+  // external dsh session transcript (the harness cannot intercept those). These
+  // accumulators sum the driver-reported signal so TaskRecord reflects reality
+  // for the model driver without double-counting the harness-side counter.
+  let driverReportedSelfDebug = 0;
+  let driverTokenInput: number | null = null;
+  let driverTokenOutput: number | null = null;
 
   const callSelfDebug: (() => Promise<string>) | null = driver.selfDebugAvailable
     ? async () => {
@@ -123,6 +211,17 @@ export async function runTask(
       markEligibleTurn,
     };
     const res = await driver.runRound(ctx);
+    if (res.selfDebugCalls && res.selfDebugCalls > 0) {
+      driverReportedSelfDebug += res.selfDebugCalls;
+    }
+    if (res.tokens) {
+      if (res.tokens.input != null) {
+        driverTokenInput = (driverTokenInput ?? 0) + res.tokens.input;
+      }
+      if (res.tokens.output != null) {
+        driverTokenOutput = (driverTokenOutput ?? 0) + res.tokens.output;
+      }
+    }
     if (res.claimedDone) {
       claimedDone = true;
       break;
@@ -163,19 +262,27 @@ export async function runTask(
     // ignore cleanup races
   }
 
-  const callRate = eligibleTurns > 0 ? selfDebugCalls / eligibleTurns : null;
+  const callRate = eligibleTurns > 0 ? (selfDebugCalls + driverReportedSelfDebug) / eligibleTurns : null;
+
+  // Token source: 'dsh' when the driver reported model token usage (real run),
+  // else 'none' (offline/scripted). Totals accumulate across rounds.
+  const tokens: TokenAccount =
+    driverTokenInput !== null || driverTokenOutput !== null
+      ? { input: driverTokenInput, output: driverTokenOutput, source: 'dsh' }
+      : { input: null, output: null, source: 'none' };
 
   return {
     taskId: task.id,
     arm: driver.arm,
     driver: driver.name,
+    status: 'run',
     roundsUsed,
     maxRounds,
     claimedDone,
     eligibleTurns,
-    selfDebugCalls,
+    selfDebugCalls: selfDebugCalls + driverReportedSelfDebug,
     callRate,
-    tokens: { input: null, output: null, source: 'none' },
+    tokens,
     wallTimeMs,
     hashModified,
     modifiedFiles: changed,

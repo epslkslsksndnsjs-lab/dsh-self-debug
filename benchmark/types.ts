@@ -85,6 +85,21 @@ export interface DriverContext {
 export interface DriverRoundResult {
   /** The driver claims the task is complete and will make no more edits. */
   claimedDone: boolean;
+  /**
+   * Real-agent drivers (the dsh model driver) cannot route self_debug through
+   * `ctx.callSelfDebug` — the call happens inside the external dsh session. Such
+   * a driver reports the self_debug invocations it observed in the session
+   * transcript for this round; the harness aggregates these into TaskRecord.
+   * Scripted/offline drivers MUST leave this undefined so the harness's own
+   * `ctx.callSelfDebug` counter remains the source of truth (no double count).
+   */
+  selfDebugCalls?: number;
+  /**
+   * Real-agent drivers report the round's token usage parsed from the session
+   * log (source 'dsh'). The harness sums these across rounds. Offline/scripted
+   * drivers leave this undefined (TaskRecord.tokens stays source 'none').
+   */
+  tokens?: { input: number | null; output: number | null };
 }
 
 /** Pluggable agent driver. The scripted driver (offline) and the real dsh
@@ -115,6 +130,15 @@ export interface TaskRecord {
   taskId: string;
   arm: Arm;
   driver: string;
+  /**
+   * 'run' for a fully executed arm; 'skipped' when the harness did not execute
+   * the task (e.g. a go task with no go toolchain present). Skipped records
+   * carry a `skipReason` and are excluded from success-rate accounting so the
+   * manifest stays honest about what was actually measured.
+   */
+  status: 'run' | 'skipped';
+  /** Set when status === 'skipped'. */
+  skipReason?: string;
   /** Rounds actually used (1..maxRounds). */
   roundsUsed: number;
   maxRounds: number;
