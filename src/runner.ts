@@ -19,6 +19,12 @@ export interface CommandResult {
 
 export interface RunOptions {
   cwd: string;
+  /**
+   * Injectable clock (test hook). Production callers omit it and get
+   * Date.now; tests pass a fixed clock so reports are byte-identical,
+   * satisfying the "same inputs, same bytes" contract without weakening it.
+   */
+  now?: () => number;
 }
 
 /**
@@ -31,7 +37,8 @@ export function runCommand(
   index: number,
   options: RunOptions,
 ): Promise<CommandResult> {
-  const start = Date.now();
+  const now = options.now ?? Date.now;
+  const start = now();
   return new Promise<CommandResult>((resolve) => {
     const child = spawn(cmd.run, [], {
       cwd: options.cwd,
@@ -54,7 +61,7 @@ export function runCommand(
         status: code === 0 ? 'pass' : 'fail',
         exitCode: code,
         output,
-        durationMs: Date.now() - start,
+        durationMs: now() - start,
       });
     });
   });

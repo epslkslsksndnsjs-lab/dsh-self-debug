@@ -7,6 +7,11 @@ import { renderReport, renderUnknown } from './reporter.ts';
 export interface SelfDebugOptions {
   /** Project root to verify. Defaults to the current working directory. */
   directory?: string;
+  /**
+   * Injectable clock (test hook). With a fixed clock the report is
+   * byte-identical across runs — "same inputs, same bytes".
+   */
+  now?: () => number;
 }
 
 /**
@@ -27,6 +32,6 @@ export async function selfDebug(options: SelfDebugOptions = {}): Promise<string>
     return renderUnknown(directory);
   }
 
-  const results = await runPipeline(profile, { cwd: directory });
+  const results = await runPipeline(profile, { cwd: directory, now: options.now });
   return renderReport({ profile, results, directory });
 }

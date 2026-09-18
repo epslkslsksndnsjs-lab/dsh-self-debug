@@ -36,8 +36,11 @@ describe('report seam (external behaviour: returned text only)', () => {
 
   it('yields the all-pass report for a healthy node fixture (byte-stable across runs)', async () => {
     tmp = copyFixture('node-healthy');
-    const first = await selfDebug({ directory: tmp });
-    const second = await selfDebug({ directory: tmp });
+    // Fixed clock: durations become constants, so "same inputs, same bytes"
+    // holds exactly (issue acceptance) — no weakened length-only assertion.
+    const fixedNow = () => 1_000_000;
+    const first = await selfDebug({ directory: tmp, now: fixedNow });
+    const second = await selfDebug({ directory: tmp, now: fixedNow });
 
     expect(first).toContain('project: node (package.json)');
     expect(first).toContain('all checks passed');
@@ -51,14 +54,13 @@ describe('report seam (external behaviour: returned text only)', () => {
     // Per-command durations present.
     expect(first).toMatch(/\[PASS\] \d{4}ms/);
 
-    // Determinism (issue acceptance): the report is identical across runs
-    // except for the real wall-clock durations, which vary by run. We assert
-    // (a) byte-length stability and (b) full byte identity once the variable
-    // duration tokens are removed — proving no hidden state or ordering
-    // nondeterminism in the rendering.
-    expect(Buffer.byteLength(first)).toBe(Buffer.byteLength(second));
+    // Determinism (issue acceptance): same inputs, same bytes.
+    expect(first).toBe(second);
+
+    // Real-clock run still succeeds and only differs in duration tokens.
+    const third = await selfDebug({ directory: tmp });
     const stripDurations = (s: string): string => s.replace(/\d+ms/g, '');
-    expect(stripDurations(first)).toBe(stripDurations(second));
+    expect(stripDurations(third)).toBe(stripDurations(first));
   });
 
   it('produces a byte-identical cannot-identify report across two runs of the same directory', async () => {

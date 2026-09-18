@@ -3,10 +3,10 @@ import type { CommandResult } from './runner.ts';
 
 // Pure-text, deterministic report rendering. No hidden state.
 //
-// Determinism note: per-command durations vary run to run, so they are rendered
-// at a FIXED WIDTH ("%04dms") to keep the report's byte length stable across
-// runs (the acceptance criterion asserts equal byte length, not identical
-// bytes). Truncation priority (ADR-0001): hint > duration > preview.
+// Determinism note: durations are rendered at fixed width ("%04dms"), and the
+// runner accepts an injectable clock — with a fixed clock the report is
+// byte-identical across runs ("same inputs, same bytes"). Truncation priority
+// (ADR-0001): hint > duration > preview.
 
 /** Fixed-width duration token, e.g. 12 -> "0012ms". Keeps byte length stable. */
 function fmtDuration(ms: number): string {
