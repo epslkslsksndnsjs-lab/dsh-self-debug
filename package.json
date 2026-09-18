@@ -25,7 +25,8 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "typecheck:dsh": "tsc -p dsh/tsconfig.json",
-    "admit": "node --experimental-strip-types scripts/admit.ts"
+    "admit": "node --experimental-strip-types scripts/admit.ts",
+    "benchmark": "node --experimental-strip-types benchmark/run.ts"
   },
   "devDependencies": {
     "@types/node": "^22.20.3",
