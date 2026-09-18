@@ -1,0 +1,10 @@
+{
+  "name": "node-healthy-fixture",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "lint": "node -e \"process.exit(0)\"",
+    "test": "node -e \"if (1 + 1 !== 2) { process.exit(1); } process.exit(0);\"",
+    "build": "node -e \"process.exit(0)\""
+  }
+}

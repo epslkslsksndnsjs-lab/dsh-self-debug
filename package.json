@@ -1,0 +1,22 @@
+{
+  "name": "dsh-self-debug",
+  "version": "0.1.0",
+  "description": "In-task self-check tool plugin for DeepSeek Harness: detect project type, run the matching verification pipeline, and return a deterministic pure-text report.",
+  "type": "module",
+  "license": "MIT",
+  "private": true,
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}

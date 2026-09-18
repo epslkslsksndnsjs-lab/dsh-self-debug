@@ -1,0 +1,10 @@
+{
+  "name": "node-failing-fixture",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "lint": "node -e \"process.exit(0)\"",
+    "test": "node -e \"console.error('assertion failed: expected 2 but got 3'); process.exit(1);\"",
+    "build": "node -e \"require('fs').writeFileSync(process.env.BUILD_MARKER || 'build-ran.marker', ''); process.exit(0);\""
+  }
+}
