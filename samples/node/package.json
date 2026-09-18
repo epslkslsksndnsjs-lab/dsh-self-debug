@@ -1,0 +1,14 @@
+{
+  "name": "dsh-sample-node",
+  "version": "0.1.0",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "lint": "node --check src/index.js",
+    "test": "node --test",
+    "build": "node --check src/broken.js",
+    "bug:env": "node scripts/missing-dep.js",
+    "bug:perm": "node scripts/perm.js",
+    "bug:timeout": "node scripts/timeout.js"
+  }
+}

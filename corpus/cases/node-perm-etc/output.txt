@@ -1,0 +1,26 @@
+
+> dsh-sample-node@0.1.0 bug:perm
+> node scripts/perm.js
+
+node:fs:2430
+    return binding.writeFileUtf8(
+                   ^
+
+Error: EACCES: permission denied, open '/etc/dsh-self-debug-sample-node'
+    at Object.writeFileSync (node:fs:2430:20)
+    at Object.<anonymous> (/Users/Admin/WorkBuddy/项目/dsh-self-debug/samples/node/scripts/perm.js:5:4)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14)
+    at Object..js (node:internal/modules/cjs/loader:1838:10)
+    at Module.load (node:internal/modules/cjs/loader:1441:32)
+    at Function._load (node:internal/modules/cjs/loader:1263:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:171:5)
+    at node:internal/main/run_main_module:36:49 {
+  errno: -13,
+  code: 'EACCES',
+  syscall: 'open',
+  path: '/etc/dsh-self-debug-sample-node'
+}
+
+Node.js v22.22.2

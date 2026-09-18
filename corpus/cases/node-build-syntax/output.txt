@@ -1,0 +1,13 @@
+
+> dsh-sample-node@0.1.0 build
+> node --check src/broken.js
+
+/Users/Admin/WorkBuddy/项目/dsh-self-debug/samples/node/src/broken.js:3
+const x = ;
+          ^
+
+SyntaxError: Unexpected token ';'
+    at wrapSafe (node:internal/modules/cjs/loader:1637:18)
+    at checkSyntax (node:internal/main/check_syntax:78:3)
+
+Node.js v22.22.2

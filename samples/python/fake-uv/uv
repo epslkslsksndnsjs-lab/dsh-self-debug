@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+# Fake `uv` for calibration corpus capture (issue #8 / T7). Mirrors the real
+# `uv run <cmd>` surface but emits controlled, deterministic output so python
+# corpus cases need no real uv/pytest/ruff install. Output is selected by
+# DSH_BUG. Where it strengthens the capture, it delegates to real python3.
+#
+# Install on PATH ahead of the real uv with:
+#   PATH="$PWD/samples/python/fake-uv:$PATH" node scripts/capture.ts "uv run pytest" samples/python
+set -u
+
+BUG="${DSH_BUG:-assertion}"
+
+case "$BUG" in
+  assertion)
+    cat <<'EOF'
+============================= test session starts ==============================
+collected 1 item
+
+tests/test_sample.py F                                                    [100%]
+
+================================== FAILURES ===================================
+______________________________ test_answer _______________________________
+
+    def test_answer():
+>       assert add(2, 2) == 5
+E       assert 4 == 5
+
+tests/test_sample.py:3: AssertionError
+=========================== short test summary info ===========================
+FAILED tests/test_sample.py::test_answer - assert 4 == 5
+1 failed in 0.01s
+EOF
+    exit 1
+    ;;
+  environment)
+    # Real `uv run` with a missing tool prints a command-not-found style error.
+    echo "uv: command not found: pytest (add it with \`uv pip install pytest\`)" >&2
+    exit 127
+    ;;
+  build)
+    # Genuine python syntax check of the broken module.
+    python3 -m py_compile broken.py
+    exit 1
+    ;;
+  timeout)
+    echo "panic: test timed out after 2s"
+    sleep 999
+    ;;
+  permission)
+    # Genuine EACCES from real python3 writing to a root-owned path.
+    python3 -c "open('/etc/dsh-self-debug-sample-python', 'w')"
+    exit 1
+    ;;
+  *)
+    echo "fake-uv: unknown DSH_BUG=$BUG" >&2
+    exit 1
+    ;;
+esac

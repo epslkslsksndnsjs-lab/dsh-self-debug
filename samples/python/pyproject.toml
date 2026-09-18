@@ -1,0 +1,11 @@
+[project]
+name = "dsh-sample-python"
+version = "0.1.0"
+description = "Sample python project for calibration corpus capture (issue #8 / T7)"
+requires-python = ">=3.11"
+
+[tool.uv]
+# The real python pipeline is `uv run pytest` / `uv run ruff check .`. For
+# corpus capture we shadow `uv` with a fake on PATH (see fake-uv/uv) so no real
+# uv/pytest/ruff install is required; the fake emits controlled, deterministic
+# output and delegates to real python3 where it makes the capture genuine.

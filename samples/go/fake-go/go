@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+# Fake `go` for calibration corpus capture (issue #8 / T7). No real go toolchain
+# is installed, so we shadow `go` with this script on PATH and emit controlled,
+# deterministic output that mimics real `go build`/`go test` failure shapes.
+# Output is selected by DSH_BUG.
+#
+# Install on PATH ahead of any real go with:
+#   PATH="$PWD/samples/go/fake-go:$PATH" node scripts/capture.ts "go build ./..." samples/go
+set -u
+
+BUG="${DSH_BUG:-build}"
+
+case "$BUG" in
+  build)
+    cat <<'EOF'
+# command-line-arguments
+./main.go:5:6: undefined: missingFunc
+EOF
+    exit 1
+    ;;
+  assertion)
+    cat <<'EOF'
+--- FAIL: TestAdd (0.00s)
+    main_test.go:6: 
+         Error Trace:
+         Error:  Not equal: 
+                expected: 5
+                actual  : 4
+FAIL
+exit status 1
+EOF
+    exit 1
+    ;;
+  environment)
+    # Real `go build` with an unresolved import prints a "cannot find package".
+    echo "./main.go:3:8: cannot find package \"missing\" in any of [REDACTED_GOPATH]"
+    exit 1
+    ;;
+  timeout)
+    echo "panic: test timed out after 2s"
+    sleep 999
+    ;;
+  permission)
+    echo "go: open /usr/local/dsh-self-debug-sample-go: permission denied"
+    exit 1
+    ;;
+  *)
+    echo "fake-go: unknown DSH_BUG=$BUG" >&2
+    exit 1
+    ;;
+esac
