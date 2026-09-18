@@ -71,6 +71,21 @@ report text (byte-stable across runs) and real subprocess behaviour (the runner
 resolves on process `exit`, not on pipe `close`). Fixture projects under
 `test/fixtures/` run fully offline.
 
+## Install into a dsh profile
+
+This package is a native dsh (DeepSeek Harness) Cordis plugin. Add it to a
+local or remote dsh profile with the harness CLI:
+
+```sh
+dsh plugin --profile <name> add github:epslkslsksndnsjs-lab/dsh-self-debug
+```
+
+After install, a dsh session in that profile sees and can invoke the
+`self_debug` tool. The plugin is registered through the harness tool registry
+via `cordis.patch.yml` (`dsh.bundle.patch` in `package.json`); no AGENTS.md or
+system-prompt section is touched — the tool description is the sole
+model-guidance channel (ADR-0001, §Model guidance).
+
 ## License
 
 MIT
