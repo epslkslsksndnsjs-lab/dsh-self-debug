@@ -1,0 +1,8 @@
+tests/test_add.py::test_add FAILED
+tests/test_add.py:3: in test_add
+    x = add(2, 2)
+>   assert x == 5
+E   assert 4 == 5
+E    +  where 4 = add(2, 2)
+
+tests/test_add.py:3: AssertionError

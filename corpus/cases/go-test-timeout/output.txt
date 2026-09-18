@@ -1,0 +1,5 @@
+panic: test timed out after 10s
+
+goroutine 1 [running]:
+FAIL
+exit status 1

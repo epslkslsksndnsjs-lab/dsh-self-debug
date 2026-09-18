@@ -1,0 +1,4 @@
+tests/test_thing.py::test_thing ERROR
+tests/test_thing.py:2: in test_thing
+    import requests
+E   ModuleNotFoundError: No module named 'requests'

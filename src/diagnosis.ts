@@ -3,6 +3,13 @@
 // function of the failed command's captured output only. `unknown` is a
 // first-class outcome — a wrong hint is more poisonous than no hint, so an
 // unrecognised failure is reported honestly rather than forced into a class.
+//
+// Patterns are ordered: coarser, higher-priority environmental signals
+// (missing tool / denied access) are checked before the failure-shape classes
+// so a missing-binary crash is never mistaken for an assertion failure. The
+// signatures below are calibrated against the captured-output fixtures in
+// corpus/ (see corpus/index.ts) — extending either list is a tree change and
+// must keep every admitted case green.
 
 export type FailureClass =
   | 'build_error'
@@ -19,26 +26,24 @@ export interface Diagnosis {
   hint: string;
 }
 
-// Ordered: first match wins. Coarser, higher-priority environmental signals
-// (missing tool / denied access) are checked before the failure-shape classes
-// so a missing-binary crash is never mistaken for an assertion failure.
+// Ordered: first match wins.
 const PATTERNS: ReadonlyArray<readonly [FailureClass, RegExp]> = [
   [
     'environment_error',
-    /command not found|not recognized as|enoent|no such file or directory|cannot find module|module not found|program is not installed|spawn .* enoent/i,
+    /command not found|not recognized as|enoent|no such file or directory|cannot find module|module not found|program is not installed|spawn .* enoent|modulenotfounderror|no module named|cannot find package/i,
   ],
   ['permission_error', /eacces|permission denied|operation not permitted/i],
   [
     'timeout',
-    /timed out|exceeded timeout|etimedout|timeout of \d+ ms|timeouterror/i,
+    /timed out|exceeded timeout|etimedout|timeout of \d+ ms|timeouterror|timeout >|test timed out|panic: test timed out/i,
   ],
   [
     'build_error',
-    /error ts\d+|failed to compile|compilation error|syntaxerror|cannot find name|is not assignable to|rollup.*error|webpack.*error|tsc:|type error/i,
+    /error ts\d+|failed to compile|compilation error|syntaxerror|cannot find name|is not assignable to|rollup.*error|webpack.*error|tsc:|type error|undefined:|cannot use .* as type|missing return at end|undeclared name/i,
   ],
   [
     'assertion_failure',
-    /assertion ?failed|assertionerror|expected .* (but|to be|to equal)|expect\(.*\)\.(tobe|toequal|tostrictequal)|\b✕|\b✗|\bassert\(/i,
+    /assertion ?failed|assertionerror|expected .* (but|to be|to equal)|\bassert\b|--- fail:|✕|✗|assert\(/i,
   ],
 ];
 
@@ -54,6 +59,8 @@ export function classify(output: string): FailureClass {
 
 // Fixed hints, 2-4 lines each (ADR-0001). Sub-distinctions live in the hint
 // text, not in new classes, to keep ~3-4 calibration samples per real class.
+// environment_error encodes the missing-tool vs missing-dependency two-step;
+// the text is the glossary seed documented in docs/glossary.md.
 export const HINTS: Record<FailureClass, string> = {
   build_error: [
     'Compilation, transpile, or typecheck failed before any test ran.',
@@ -71,9 +78,9 @@ export const HINTS: Record<FailureClass, string> = {
     'Re-run with a longer timeout or narrower scope to isolate the hang.',
   ].join('\n'),
   environment_error: [
-    'A required tool, binary, or dependency was missing (command not found / ENOENT).',
-    'Install the missing dependency or activate the correct environment/venv.',
-    'Confirm the toolchain is on PATH and the project install step succeeded.',
+    'A required tool, binary, or dependency was missing (command not found / ENOENT / ModuleNotFound).',
+    'Step 1 — missing tool: the command itself was not found; install it or add it to PATH.',
+    'Step 2 — missing dependency: the tool ran but a module/package was unresolved; install deps (uv / venv / go mod).',
   ].join('\n'),
   permission_error: [
     'The command was denied by the filesystem or sandbox (EACCES / permission denied).',

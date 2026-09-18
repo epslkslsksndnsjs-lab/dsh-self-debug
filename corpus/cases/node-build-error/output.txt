@@ -1,0 +1,1 @@
+src/index.ts(1,1): error TS2304: Cannot find name 'foo'

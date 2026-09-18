@@ -1,0 +1,4 @@
+  File "module.py", line 1
+    def foo(:
+              ^
+SyntaxError: invalid syntax

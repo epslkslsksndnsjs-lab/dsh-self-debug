@@ -1,0 +1,7 @@
+--- FAIL: TestAdd (0.00s)
+    add_test.go:10:
+        Error Trace:
+        add_test.go:10
+        Error:      Not equal: expected 4, actual 5
+FAIL
+exit status 1

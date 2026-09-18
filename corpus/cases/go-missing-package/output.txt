@@ -1,0 +1,3 @@
+main.go:3:8: cannot find package "github.com/foo/bar" in any of:
+	/usr/local/go/src/github.com/foo/bar (from $GOROOT)
+	($GOPATH not set)

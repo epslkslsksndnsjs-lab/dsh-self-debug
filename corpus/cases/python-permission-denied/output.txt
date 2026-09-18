@@ -1,0 +1,4 @@
+Traceback (most recent call last):
+  File "run.py", line 5, in <module>
+    open('/root/data', 'w')
+PermissionError: [Errno 13] Permission denied: '/root/data'
