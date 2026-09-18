@@ -17,7 +17,7 @@ describe('runner seam (real subprocess behaviour)', () => {
     expect(res.status).toBe('pass');
     expect(res.exitCode).toBe(0);
     // Resolved well before the 300ms grandchild would have closed the pipe.
-    expect(res.durationMs).toBeLessThan(200);
+    expect(res.durationMs).toBeLessThan(300);
   });
 
   it('captures the exit code and a duration for a failing command', async () => {

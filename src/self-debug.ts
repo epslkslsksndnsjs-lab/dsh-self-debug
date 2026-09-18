@@ -14,6 +14,16 @@ export interface SelfDebugOptions {
    * byte-identical across runs — "same inputs, same bytes".
    */
   now?: () => number;
+  /**
+   * Per-command timeout in milliseconds (runner process hardening, T3). Off
+   * when unset — the runner then relies on the child exiting on its own.
+   */
+  timeoutMs?: number;
+  /**
+   * Hard cap on captured output bytes per command (runner ring buffer). Off
+   * when unset (default 8 MiB in the runner).
+   */
+  maxOutputBytes?: number;
 }
 
 /**
@@ -56,7 +66,12 @@ export async function selfDebug(options: SelfDebugOptions = {}): Promise<string>
     return renderUnknown(directory);
   }
 
-  const results = await runPipeline(profile, { cwd: directory, now: options.now });
+  const results = await runPipeline(profile, {
+    cwd: directory,
+    now: options.now,
+    timeoutMs: options.timeoutMs,
+    maxOutputBytes: options.maxOutputBytes,
+  });
   persistFailureLogs(directory, results);
   return renderReport({ profile, results, directory });
 }

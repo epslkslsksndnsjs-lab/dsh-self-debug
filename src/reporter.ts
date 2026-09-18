@@ -21,9 +21,12 @@ function fmtDuration(ms: number): string {
 /** Hard 60-line / 4 KB report cap (ADR-0001 decision 5). */
 const BUDGET_LINES = 60;
 const BUDGET_BYTES = 4096;
-/** Normal preview size; shrinks toward OVER_BUDGET_PREVIEW when over budget. */
-const PREVIEW_MAX_LINES = 50;
-const OVER_BUDGET_PREVIEW = 10;
+/**
+ * Preview cap in BYTES (not UTF-16 code units). Kept small because the full log
+ * is on disk; shrinks further when the report is over budget.
+ */
+const PREVIEW_MAX_BYTES = 2048;
+const OVER_BUDGET_PREVIEW_BYTES = 160;
 
 export interface ReportOptions {
   profile: Profile;
@@ -32,14 +35,33 @@ export interface ReportOptions {
   directory: string;
 }
 
-/** Render the tail `cap` lines of a command's output (tail truncation). */
-function tailPreview(output: string, cap: number): string {
-  return output
-    .replace(/\r\n/g, '\n')
-    .replace(/\r/g, '\n')
-    .split('\n')
-    .slice(-cap)
-    .join('\n');
+/**
+ * Tail truncation in the byte domain: keep the last lines of `text` whose
+ * combined UTF-8 byte length stays within `maxBytes`, dropping the oldest
+ * (head). Line-aware so whole lines are kept, and byte-safe so a multi-byte
+ * character is never cut in half. The tail (most recent output) is preserved.
+ */
+export function truncateTail(text: string, maxBytes: number): string {
+  if (maxBytes <= 0) return '';
+  const normalized = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const lines = normalized.split('\n');
+  const kept: string[] = [];
+  let total = 0;
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i]!;
+    const add = Buffer.byteLength(line, 'utf8') + (kept.length > 0 ? 1 : 0);
+    if (kept.length > 0 && total + add > maxBytes) break;
+    kept.unshift(line);
+    total += add;
+  }
+  // A single line longer than the cap is trimmed from its head, byte-safe.
+  if (kept.length === 1 && Buffer.byteLength(kept[0]!, 'utf8') > maxBytes) {
+    const buf = Buffer.from(kept[0]!, 'utf8');
+    let start = buf.length - maxBytes;
+    while (start < buf.length && (buf[start]! & 0xc0) === 0x80) start++;
+    kept[0] = buf.subarray(start).toString('utf8');
+  }
+  return kept.join('\n');
 }
 
 function renderResults(results: CommandResult[], previewCap: number): string {
@@ -48,10 +70,11 @@ function renderResults(results: CommandResult[], previewCap: number): string {
     if (r.status === 'pass') {
       lines.push(`${r.index + 1}. ${r.label} [PASS] ${fmtDuration(r.durationMs)}`);
     } else if (r.status === 'fail') {
+      const tail = r.timedOut ? ' (timeout)' : ` (exit ${r.exitCode})`;
       lines.push(
-        `${r.index + 1}. ${r.label} [FAIL] ${fmtDuration(r.durationMs)} (exit ${r.exitCode})`,
+        `${r.index + 1}. ${r.label} [FAIL] ${fmtDuration(r.durationMs)}${tail}`,
       );
-      const preview = tailPreview(r.output, previewCap).trim();
+      const preview = truncateTail(r.output, previewCap).trim();
       if (preview) {
         lines.push(preview);
       }
@@ -93,14 +116,15 @@ export function renderReport(options: ReportOptions): string {
 
   // The report has a hard cap; only the preview length is a budget variable,
   // so hints + durations are never touched (hard rule hint > duration > preview).
-  // If the full report is over budget, shrink the preview toward OVER_BUDGET_PREVIEW.
+  // If the full report is over budget, shrink the preview toward
+  // OVER_BUDGET_PREVIEW_BYTES.
   const overBudget = (s: string): boolean =>
     s.split('\n').length > BUDGET_LINES || Buffer.byteLength(s, 'utf8') > BUDGET_BYTES;
 
-  let previewCap = PREVIEW_MAX_LINES;
+  let previewCap = PREVIEW_MAX_BYTES;
   let report = assemble(previewCap);
-  if (overBudget(report) && previewCap > OVER_BUDGET_PREVIEW) {
-    previewCap = OVER_BUDGET_PREVIEW;
+  if (overBudget(report) && PREVIEW_MAX_BYTES > OVER_BUDGET_PREVIEW_BYTES) {
+    previewCap = OVER_BUDGET_PREVIEW_BYTES;
     report = assemble(previewCap);
   }
 
