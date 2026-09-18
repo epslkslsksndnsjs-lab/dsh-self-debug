@@ -1,0 +1,8 @@
+{
+  "name": "node-permission-error-fixture",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "test": "node -e \"require('fs').writeFileSync('/etc/dsh-probe','x'); process.exit(1)\""
+  }
+}

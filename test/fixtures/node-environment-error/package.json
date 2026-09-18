@@ -1,0 +1,8 @@
+{
+  "name": "node-environment-error-fixture",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "test": "node -e \"require('child_process').execSync('definitely_missing_cmd_xyz'); process.exit(1)\""
+  }
+}

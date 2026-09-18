@@ -1,0 +1,10 @@
+{
+  "name": "node-build-error-fixture",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "lint": "node -e \"process.exit(0)\"",
+    "test": "node -e \"process.exit(0)\"",
+    "build": "node -e \"console.error('src/index.ts(1,1): error TS2304: Cannot find name 'foo'); process.exit(1)\""
+  }
+}

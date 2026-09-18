@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process';
 import type { Command, Profile } from './profiles.ts';
+import { diagnose, type Diagnosis } from './diagnosis.ts';
 
 export type CommandStatus = 'pass' | 'fail' | 'skip';
 
@@ -15,6 +16,10 @@ export interface CommandResult {
   output: string;
   /** Wall-clock duration in milliseconds. */
   durationMs: number;
+  /** Diagnosis for failed commands (ADR-0001 decision tree). Absent on pass/skip. */
+  diagnosis?: Diagnosis;
+  /** Path to the temp file holding the full (untruncated) output. Set by the caller. */
+  logPath?: string;
 }
 
 export interface RunOptions {
@@ -54,14 +59,18 @@ export function runCommand(
     child.stderr?.on('data', onData);
 
     child.on('exit', (code) => {
+      const status = code === 0 ? 'pass' : 'fail';
       resolve({
         index,
         label: cmd.label,
         run: cmd.run,
-        status: code === 0 ? 'pass' : 'fail',
+        status,
         exitCode: code,
         output,
         durationMs: now() - start,
+        // Diagnosis is a pure function of the captured output, so it is safe to
+        // compute here; the full log (for the report) is written by the caller.
+        diagnosis: status === 'fail' ? diagnose(output) : undefined,
       });
     });
   });

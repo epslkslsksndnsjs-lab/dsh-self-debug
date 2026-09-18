@@ -1,0 +1,8 @@
+{
+  "name": "node-unknown-fixture",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "test": "node -e \"console.error('mysterious gremlin intercepted the process'); process.exit(1)\""
+  }
+}
