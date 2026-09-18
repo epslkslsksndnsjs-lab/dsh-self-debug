@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Fake `go` stub for offline dsh-self-debug tests. Mimics `go <cmd>` failure
+# output so diagnosis classifications can be exercised without a real Go
+# toolchain (issue #6 fixture strategy: PATH injection, not real tools).
+case "$1" in
+  build)
+    cat <<'GOEOF'
+# example.com/go-failing-fixture
+./main.go:5:6: undefined: missingFunc
+GOEOF
+    exit 1
+    ;;
+  test)
+    echo "--- FAIL: TestMain (0.00s)"
+    echo "    main_test.go:8: expected 2 but got 3"
+    exit 1
+    ;;
+  vet)
+    echo "./main.go:5:6: undefined: missingFunc (from go vet)"
+    exit 1
+    ;;
+  *)
+    exit 0
+    ;;
+esac

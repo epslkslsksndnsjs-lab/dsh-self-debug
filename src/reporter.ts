@@ -143,3 +143,66 @@ export function renderUnknown(directory: string): string {
   lines.push(`no matching project found in: ${directory}`);
   return `${lines.join('\n')}\n`;
 }
+
+export interface ReportSection {
+  profile: Profile;
+  results: CommandResult[];
+}
+
+/**
+ * Render a mixed-repo report: every detected profile becomes its own section,
+ * each with its own command lines, Diagnosis blocks, and per-section verdict.
+ * A single top-level `commands:` tally and overall verdict summarize the run.
+ *
+ * Determinism and the truncation-priority rule (hint > duration > preview) are
+ * inherited from `renderResults`/`renderReport`; only the preview length is a
+ * budget variable, so hints and durations are never touched.
+ */
+export function renderMultiReport(options: {
+  directory: string;
+  sections: ReportSection[];
+}): string {
+  const { directory, sections } = options;
+
+  let passed = 0;
+  let failed = 0;
+  let skipped = 0;
+  for (const s of sections) {
+    for (const r of s.results) {
+      if (r.status === 'pass') passed++;
+      else if (r.status === 'fail') failed++;
+      else skipped++;
+    }
+  }
+
+  const projectList = sections.map((s) => `${s.profile.label} (${s.profile.marker})`).join(', ');
+  const header = [
+    'self_debug report',
+    `projects: ${projectList}`,
+    `directory: ${directory}`,
+    `commands: ${passed} passed, ${failed} failed, ${skipped} skipped`,
+    '--',
+  ].join('\n');
+
+  const assemble = (previewCap: number): string => {
+    const bodies = sections.map((s) => {
+      const body = renderResults(s.results, previewCap);
+      const secFailed = s.results.filter((r) => r.status === 'fail').length;
+      const secSummary = secFailed === 0 ? 'all checks passed' : `${secFailed} check${secFailed === 1 ? '' : 's'} failed`;
+      return `== ${s.profile.label} (${s.profile.marker}) ==\n${body}\n--\n${secSummary}`;
+    });
+    const overallSummary = failed === 0 ? 'all checks passed' : `${failed} check${failed === 1 ? '' : 's'} failed`;
+    return `${header}\n${bodies.join('\n')}\n--\n${overallSummary}\n`;
+  };
+
+  const overBudget = (s: string): boolean =>
+    s.split('\n').length > BUDGET_LINES || Buffer.byteLength(s, 'utf8') > BUDGET_BYTES;
+
+  let previewCap = PREVIEW_MAX_BYTES;
+  let report = assemble(previewCap);
+  if (overBudget(report) && PREVIEW_MAX_BYTES > OVER_BUDGET_PREVIEW_BYTES) {
+    previewCap = OVER_BUDGET_PREVIEW_BYTES;
+    report = assemble(previewCap);
+  }
+  return report;
+}

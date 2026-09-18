@@ -55,12 +55,18 @@ export const PROFILES: readonly Profile[] = [
   },
 ];
 
-/** Detect the project profile for `dir` by marker-file presence. Returns null when unknown. */
-export function detectProfile(dir: string): Profile | null {
+/**
+ * Detect every project profile for `dir` by marker-file presence. A mixed repo
+ * (e.g. a `package.json` *and* a `pyproject.toml`) yields both profiles, each
+ * run as its own pipeline section. Order follows `PROFILES` so the report is
+ * deterministic. Returns an empty array when nothing matches.
+ */
+export function detectProfiles(dir: string): Profile[] {
+  const found: Profile[] = [];
   for (const profile of PROFILES) {
     if (existsSync(join(dir, profile.marker))) {
-      return profile;
+      found.push(profile);
     }
   }
-  return null;
+  return found;
 }

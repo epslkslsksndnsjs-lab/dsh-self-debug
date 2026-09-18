@@ -1,0 +1,5 @@
+[project]
+name = "python-failing-fixture"
+version = "1.0.0"
+description = "dsh-self-debug python fixture (marker only; uv is stubbed on PATH)"
+requires-python = ">=3.11"
